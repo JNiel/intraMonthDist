@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "holiday_scraper <- function(countries = c(\"sweden\", \"austria\", \"norway\", \"denmark\", \"finland\", \"germany\", \"netherlands\", \"uk\", \"us\"),\n                            start_year = 2010,\n                            end_year = 2020){\n  #' A Holiday Scraper\n  #'\n  #' This function allows you to gather holiday dates and their type for specified countries over a specified time period.\n  #' Data is gathered from timeanddate.com, so make sure your internet connection is up for it to work properly.\n  #' Output data frame \"master calendar\" with variables:\n  #' country - Country for given holiday dates.\n  #' year - Year of given holiday dates.\n  #' Date - date of the actual holiday listed.\n  #' holiday_name - Official name of holiday given in calendar.\n  #' holiday_type - Type of holiday. All types are included here, in total 26 different.\n  #' Date_fmt - Date output in date format Y-m-d.\n  #' @param countries Vector with countries for which holidays are wanted. Full name, lower case, with exception of \"uk\" and \"us\". Defaults to c(\"sweden\", \"norway\", \"denmark\", \"finland\", \"germany\", \"netherlands\", \"uk\", \"us\").\n  #' @param start_year Numeric year of which you want the calendar to start from. Defaults to 2010.\n  #' @param end_year Numeric year of which you want the calendar to end at. Defaults to 2020.\n  #' @keywords calendar\n  #' @export\n  #' @examples\n  #' holiday_scraper(countries = c(\"se\", \"no\", \"fi\"), start_year = 2015, end_year = 2018)\n\n  #OBS! SINCE THIS IS A WEB SCRAPER - YOU NEED TO HAVE PROPER INTERNET CONNECTION FOR IT TO WORK.\n\n  #Jon Nielsen - 2017-01-17\n\n  require(rvest)\n  require(dplyr)\n  #Initial step: set countries you wish to get dates for and year range:\n  rm(master_calendar)\n\n  years <- seq(start_year, end_year, 1)\n  url_base <- \"https://www.timeanddate.com/holidays/\"\n  master_calendar <- data.frame()\n\n  #Set loale to english so that dates are read correctly\n  Sys.setlocale(category = \"LC_TIME\", locale =\"English\")\n\n  for(i in  1:length(countries)) {\n    for(j in 1:length(years)) {\n\n      #url <- \"https://www.timeanddate.com/holidays/sweden/2017\"\n      url <- paste(url_base, countries[i], \"/\", years[j], sep=\"\")\n      calendar <- url %>%\n        read_html() %>%\n        html_nodes(xpath = '/html/body/div[1]/div[7]/article/section[1]/div[5]/table') %>%\n        html_table() %>%\n        .[[1]] %>%\n        select(Date, holiday_name = get(\"Holiday Name\"), holiday_type = get(\"Holiday Type\"))\n      country <- rep(countries[i], dim(calendar)[1])\n      year <- rep(years[j], dim(calendar)[1])\n      master_calendar <- rbind(master_calendar, cbind(country, year, calendar)[-1,])\n    }\n  }\n  master_calendar$Date_fmt <- as.Date(paste(master_calendar$year, master_calendar$Date), format=\"%Y %b %d\")\n\n  return(master_calendar)\n}\n",
+    "created" : 1485859287041.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2392770269",
+    "id" : "8CAAA17B",
+    "lastKnownWriteTime" : 1485951053,
+    "last_content_update" : 1485951053086,
+    "path" : "~/R/Packages/intraMonthDist/intraMonthDist/R/holiday_scraper.R",
+    "project_path" : "R/holiday_scraper.R",
+    "properties" : {
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

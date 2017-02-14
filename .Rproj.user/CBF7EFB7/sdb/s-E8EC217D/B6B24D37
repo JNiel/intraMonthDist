@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "normalise_by_month <- function(b, nye, f_period){\n  #' Normalisation function used in the intraMonthDist package.\n  #'\n  #' Further information...\n  #' @param b Data frame\n  #' @param nye Extracted information for new years eve\n  #' @param f_period Forecast period\n  #' @export\n  #' @examples\n  #' att <- normalise_by_month(b = .., nye = .., f_period = ..)\n\n\n  #the logic might need to be updated further to account for indexes that cross from month to month\n  yr<-year(f_period[1])\n  if(yr %% 4 ==0 ){\n    b <- rbind(b, nye)#need to add an extra one because of leap year\n    b <- rbind(b, nye)\n  }else{\n    b <- rbind(b, nye)\n  }\n  b$Activation_date <- f_period\n  b$year <- year(f_period)\n  b$month <- month(f_period)\n  b$week <- format(b$Activation_date, format=\"%U\")\n  b$day <- weekdays(f_period)\n  m_total <- b %>%\n    group_by(Country_Code, year, month) %>%\n    summarise(t_monthly = sum(normalised_daily))\n  b <- merge(b, m_total, by = c(\"Country_Code\", \"year\", \"month\"))\n  b <- b %>%\n    mutate(updated_normalised_daily = normalised_daily/t_monthly) %>%\n    arrange(Country_Code, Activation_date)\n  return(b)\n}\n",
+    "created" : 1485953322287.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3813115194",
+    "id" : "B6B24D37",
+    "lastKnownWriteTime" : 1487072866,
+    "last_content_update" : 1487072866919,
+    "path" : "~/R/Packages/intraMonthDist/intraMonthDist/R/normalise_by_month.R",
+    "project_path" : "R/normalise_by_month.R",
+    "properties" : {
+    },
+    "relative_order" : 6,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

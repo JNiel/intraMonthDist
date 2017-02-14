@@ -1,0 +1,283 @@
+remove_rd_2yrsback<- function(d_p = daily_purchases_act,
+                              rd_effect,
+                              markets,#=c("se","at","no","dk","fi","de","nl","uk","us")
+                              forecast_range){
+
+  #'Remove red days; 2 years back in time.
+  #'
+  #'DESCRIPTION HERE
+  #'
+  #'@param d_p data frame with daily actuals data. Defaults to daily_purchases_act.
+  #'@param rd_effect Empty input matrix for red day effect values.
+  #'@param markets Markets which we want to estimate on.
+  #'@param forecast_range Forecast range.
+  #'@keywords red_day holiday
+  #'@export
+  #'@examples
+  #'EXAMPLE HERE Change
+
+  require(lubridate)
+  require(dplyr)
+  require(tidyr)
+
+  # forecast_range <- period
+  min_date <- min(forecast_range$forecast_period) - years(1)
+  period_length <- max(forecast_range$forecast_period) - years(1) - min_date + 1
+  inference_range <- data.frame(inference_period = as.Date(seq(as.Date(min_date),
+                                by = "day", length.out = period_length)))
+
+  min_date <- min(forecast_range$forecast_period) - years(2)
+  period_length <- max(forecast_range$forecast_period) - years(2) - min_date + 1
+  p_inference_range <- data.frame(inference_period = as.Date(seq(as.Date(min_date),
+                                by = "day", length.out = period_length)))
+
+  min_date <- min(forecast_range$forecast_period) - years(3)
+  period_length <- max(forecast_range$forecast_period) - years(3) - min_date + 1
+  p_p_inference_range <- data.frame(inference_period = as.Date(seq(as.Date(min_date),
+                                by = "day", length.out = period_length)))
+
+#Creating Black Friday Effect data frame----------------------------------------
+  bf_effect <- data.frame(country = markets,
+                          mon_before = 0,
+                          tue_before = 0,
+                          wed_before = 0,
+                          thu_before = 0,
+                          black_fri = 0,
+                          sat_after = 0,
+                          sun_after = 0,
+                          cyber_mon = 0,
+                          tue_after = 0,
+                          wed_after = 0,
+                          thu_after = 0,
+                          fri_after = 0
+                          )
+#Creating xmas Effect data frame------------------------------------------------
+  xmas_effect <- data.frame(country = markets,
+                           twenty_2 = 0,
+                           twenty_3 = 0,
+                           xmas_eve = 0,
+                           xmas_day = 0,
+                           boxing_day = 0,
+                           twenty_7 = 0,
+                           twenty_8 = 0,
+                           twenty_9 = 0,
+                           thritieth = 0,
+                           nye_eve = 0  )
+#Getting Holidays using the scraper---------------------------------------------
+#  if(!exists("holidays")) {
+#    holidays <- holiday_scraper()
+#    holidays$Date = as.Date(holidays$Date,"%b %d")
+#    year(holidays$Date) <- holidays$year
+#    #This might cause errors.
+#    levels(holidays$country) <-c("se","at","no","dk","fi","de","nl","uk","us")
+#    holidays <- holidays %>%
+#    mutate_if(is.factor,as.character)%>%
+#      arrange(country,Date)
+#  }
+#Loop through markets-----------------------------------------------------------
+     for (i in markets)
+       {
+  #Defining and Choosing Red Days from Holiday Scraper----------------------------
+         if(i == "at"){
+           red_days <-c("National holiday","Observance")
+         }else if(i == "de"){
+           red_days <-c("Silent Day","National holiday","Common Local holidays")
+         }else if(i == "dk"){
+           red_days <-c("National holiday")
+         }else if(i == "fi"){
+           red_days <-c("De facto holiday","National holiday")
+         }else if(i == "nl"){
+           red_days <-c("National holiday")
+         }else if(i == "no"){
+           red_days <-c("National holiday","National holiday, Flag day")
+         }else if(i == "se"){
+           red_days <-c("De facto holiday","Public holiday")
+         }else if(i == "uk"){
+           red_days <-c("Bank holiday","Christian","Common Local holidays","Public holiday")
+         }else if(i == "us"){
+           red_days <-c("Federal Holiday")
+         }
+  #holidays for current country for last 3 years----------------------------------
+         c_holidays <- holidays %>%
+           filter(country == i,
+                  Date %in% inference_range$inference_period,
+                  holiday_type %in% red_days)
+         p_holidays <- holidays %>%
+           filter(country == i,
+                  Date %in% p_inference_range$inference_period,
+                  holiday_type %in% red_days)
+         p_p_holidays <- holidays %>%
+           filter(country == i,
+                  Date %in% p_p_inference_range$inference_period,
+                  holiday_type %in% red_days)
+  #RD_TEMP effects NEEDS TO BE CREATED FROM HOLIDAYS------------------------------
+        rd_temp<-holidays %>%
+          filter(country == i,
+                 Date %in% forecast_range$forecast_period,
+                 holiday_type %in% red_days) %>%
+          select(country, year, Date, holiday_name) %>%
+          mutate(effect = 0) %>%
+          mutate(next_wd_effect = 0) %>%
+          mutate(month = month(Date))
+  #Working Days for last_year,p_year, p_p_year -----------------------------------
+        working_days <- d_p %>%
+          filter(Country_Code == i,
+                 Activation_date %in% inference_range$inference_period,
+                 !(Activation_date %in% c_holidays$Date) )###MAKE SURE ONLY RED DAYS ARE REMOVED
+        p_working_days <- d_p %>%
+          filter(Country_Code == i,
+                 Activation_date %in% p_inference_range$inference_period,
+                 !(Activation_date %in% p_holidays$Date) )###MAKE SURE ONLY RED DAYS ARE REMOVED
+        p_p_working_days <- d_p %>%
+          filter(Country_Code == i,
+                 Activation_date %in% p_p_inference_range$inference_period,
+                 !(Activation_date %in% p_p_holidays$Date) )###MAKE SURE ONLY RED DAYS ARE REMOVED
+  #Temporary Daily Purchases------------------------------------------------------
+        b <- d_p %>%
+          filter(d_p$Country_Code == i,
+                 Activation_date %in% inference_range$inference_period)
+        p_b <- d_p %>%
+          filter(d_p$Country_Code == i,
+                 Activation_date %in% p_inference_range$inference_period)
+        p_p_b <- d_p %>%
+          filter(d_p$Country_Code == i,
+                 Activation_date %in% p_p_inference_range$inference_period)
+  #Loop through Holiday-----------------------------------------------------------
+        for (k in seq(1,length(c_holidays$Date) ) )
+          {
+          #Change volume to next same working day
+          if(
+            ( (wday(c_holidays$Date[k]) %in% c(1, 7) ) |
+            (c_holidays$holiday_name[k] %in% c("Christmas Eve","Christmas Day",
+            "Boxing Day","New Year's Eve","Christmas Day observed","Bank Holiday",
+            "Second Day of Christmas","St. Stephen's Day","2nd Christmas Day") ) )
+            )
+          {
+            if(wday(c_holidays$Date[k]) %in% c(1, 7) )
+              {
+              p_hol <- which(p_holidays$holiday_name == c_holidays$holiday_name[k])
+
+              if(wday(p_holidays$Date[p_hol]) %in% c(1, 7)  )
+                {
+                p_p_hol<- which(p_p_holidays$holiday_name == c_holidays$holiday_name[k])
+
+                if(wday(p_p_holidays$Date[p_p_hol]) %in% c(1, 7))
+                  {
+                  #do nothing if on weekend 3 years in a row
+                }else{#Quantify if 3 years was not on wkend
+
+                  next_same_weekday <- min( which(
+                    p_p_working_days$day == wday(p_p_holidays$Date[p_p_hol])
+                    & p_p_working_days$Activation_date > p_p_holidays$Date[p_p_hol]
+                    & p_p_working_days$Country_Code == i ) )
+
+                  #perhaps change to average between next_same_weekday and previous_same_weekday
+                  if(!is_empty(p_p_b$Daily_Volume[p_p_b$Activation_date == p_p_holidays$Date[p_p_hol] ])){
+                  rd_temp$effect[k]<- p_p_b$Daily_Volume[p_p_b$Activation_date == p_p_holidays$Date[p_p_hol] ]/p_p_working_days$Daily_Volume[next_same_weekday]
+
+                  next_work_day <- min( which(p_p_working_days$Activation_date > p_p_holidays$Date[p_p_hol]
+                                              & p_p_working_days$Country_Code == i
+                                              & (p_p_working_days$day %in% c(2, 3, 4, 5, 6) ) ) )
+                  next_work_day_sw <- min( which(p_p_working_days$Activation_date > p_p_working_days$Activation_date[next_work_day]
+                                                 & p_p_working_days$Country_Code == i
+                                                 & p_p_working_days$day == p_p_working_days$day[next_work_day] ) )
+
+                  rd_temp$next_wd_effect[k]<- p_p_b$Daily_Volume[p_p_b$Activation_date == p_p_working_days$Activation_date[next_work_day]]/p_p_working_days$Daily_Volume[next_work_day_sw]
+                }
+                  }#Quantify if Holiday fell on a weekend in p_p_year
+              }else{#If holiday fell on a weekend 2 years in a row
+
+                next_same_weekday <- min( which(
+                  p_working_days$day == wday(p_holidays$Date[p_hol])
+                  & p_working_days$Activation_date > p_holidays$Date[p_hol]
+                  & p_working_days$Country_Code == i ) )
+                #perhaps change to average between next_same_weekday and previous_same_weekday
+                if(!is_empty(p_b$Daily_Volume[p_b$Activation_date == p_holidays$Date[p_hol] ])){
+                rd_temp$effect[k]<- p_b$Daily_Volume[p_b$Activation_date == p_holidays$Date[p_hol] ]/p_working_days$Daily_Volume[next_same_weekday]
+
+                next_work_day <- min( which(p_working_days$Activation_date > p_holidays$Date[p_hol]
+                                            & p_working_days$Country_Code == i
+                                            & (p_working_days$day %in% c(2, 3, 4, 5, 6) ) ) )
+                next_work_day_sw <- min( which(p_working_days$Activation_date > p_working_days$Activation_date[next_work_day]
+                                               & p_working_days$Country_Code == i
+                                               & p_working_days$day == p_working_days$day[next_work_day] ) )
+
+                rd_temp$next_wd_effect[k]<- p_b$Daily_Volume[p_b$Activation_date == p_working_days$Activation_date[next_work_day]]/p_working_days$Daily_Volume[next_work_day_sw]
+              }
+                }#Quantify if Holiday did not fall on a weekend in p_year
+            }#If the holiday fell on a weekend last year
+            if(c_holidays$holiday_name[k] %in% c("Christmas Eve","Christmas Day",
+           "Boxing Day","Christmas Day observed","Bank Holiday",
+           "Second Day of Christmas","St. Stephen's Day","2nd Christmas Day") )
+              {
+
+              prev_same_weekday <- max( which(
+                working_days$day == wday(c_holidays$Date[k])
+                & working_days$Activation_date < c_holidays$Date[k]
+                & working_days$Country_Code == i ) )
+              #perhaps change to average between next_same_weekday and previous_same_weekday
+
+              rd_temp$effect[k]<- b$Daily_Volume[b$Activation_date == c_holidays$Date[k] ]/working_days$Daily_Volume[prev_same_weekday]
+              rd_temp$next_wd_effect[k]<- 1
+            }#Quantifying Xmas eve to Boxing day
+          }else{#If holiday was on a weekend or one of the special holidays
+              next_same_weekday <- min( which(
+                               working_days$day == wday(c_holidays$Date[k])
+                               & working_days$Activation_date > c_holidays$Date[k]
+                               & working_days$Country_Code == i ) )
+
+              rd_temp$effect[k]<- b$Daily_Volume[b$Activation_date == c_holidays$Date[k] ]/working_days$Daily_Volume[next_same_weekday]
+
+              b$Daily_Volume[b$Activation_date == c_holidays$Date[k] ] <- working_days$Daily_Volume[next_same_weekday]
+
+              next_work_day <- min( which(working_days$Activation_date > c_holidays$Date[k]
+                                          & working_days$Country_Code == i
+                                          & (working_days$day %in% c(2, 3, 4, 5, 6) ) ) )
+              next_work_day_sw <- min( which(working_days$Activation_date > working_days$Activation_date[next_work_day]
+                                    & working_days$Country_Code == i
+                                    & working_days$day == working_days$day[next_work_day] ) )
+
+              rd_temp$next_wd_effect[k]<- b$Daily_Volume[b$Activation_date == working_days$Activation_date[next_work_day]]/working_days$Daily_Volume[next_work_day_sw]
+
+              b$Daily_Volume[b$Activation_date == working_days$Activation_date[next_work_day]] <- working_days$Daily_Volume[next_work_day_sw]
+          }#When Holidays was not on a weekend last_year
+        }
+
+        d_p[d_p$Country_Code == i &
+              d_p$Activation_date %in% inference_range$inference_period, ] <- b
+  #Removing and Quantifying Black Friday Effect---------------------------------------------------
+        b <- d_p[d_p$Country_Code == i &
+             d_p$Activation_date %in% inference_range$inference_period, ]
+        j <- max(which(b$day == 6 & b$month == 11 ))#Finds row for BF
+        myts <- ts(b$Daily_Volume[(j+22):(j+8)],end =c(2016), frequency=7)
+        fit <- stl(myts,s.window=7,s.degree=1)
+        f_fit <- forecast(fit,h=12)[[2]]
+
+        bf_effect[bf_effect$country == i, 13:2 ] <- b$Daily_Volume[(j+7):(j-4)]/f_fit
+
+        b$Daily_Volume[(j+7):(j-4)] <- f_fit
+        d_p[d_p$Country_Code == i &
+            d_p$Activation_date %in% inference_range$inference_period , ] <- b
+
+  #Removing and Quantifying Christmas Effect------------------------------------------------------
+
+        # remember to add xmas condition which Monday it peaks
+        b <- d_p[d_p$Country_Code == i &
+                   d_p$Activation_date %in% inference_range$inference_period, ]
+        j <- which(b$month == 12 & day(b$Activation_date) == 24) #Finds row for xmas eve
+        myts <- ts(b$Daily_Volume[(j-17):(j-3)],end =c(2016), frequency=7)
+        fit <- stl(myts,s.window=7,s.degree=1)
+        f_fit <- forecast(fit,h=10)[[2]]
+
+        xmas_effect[xmas_effect$country == i, 2:11 ] <- b$Daily_Volume[(j-2):(j+7)]/f_fit
+
+        b$Daily_Volume[(j-2):(j+7)] <- f_fit
+        d_p[d_p$Country_Code == i & d_p$Activation_date %in% inference_range$inference_period, ] <- b
+
+        rd_effect <- rbind(rd_effect,rd_temp)
+
+     }
+#Return-------------------------------------------------------------------------
+  l=list(d_p,rd_effect,bf_effect,xmas_effect)
+  return(l)
+}
